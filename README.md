@@ -1,6 +1,6 @@
 # ByteMed — Community-First Doctor-Patient Telehealth Platform
 
-> **Capstone Project** | Developed by Omkar Ingle ([@rajingle532](https://github.com/rajingle532))
+> **Capstone Project** | Collaborative Group Project
 
 ByteMed is a collaborative telehealth and physician response platform designed to connect patients seeking medical guidance with verified healthcare professionals. The system combines natural language patient inquiry intake, automated clinical categorization, AI emergency safety triage, version-controlled medical advice, and real-time telehealth video rooms.
 
@@ -51,8 +51,8 @@ ByteMed is a collaborative telehealth and physician response platform designed t
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/rajingle532/Capsotone_Project.git
-   cd Capsotone_Project
+   git clone https://github.com/rajingle532/Capstone_Project.git
+   cd Capstone_Project
    ```
 
 2. **Setup Backend:**
@@ -84,3 +84,4 @@ ByteMed is a collaborative telehealth and physician response platform designed t
 
 ## 📄 License
 This project is developed for educational and academic capstone demonstration purposes.
+
