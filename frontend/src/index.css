@@ -3,6 +3,31 @@
 :root {
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   color-scheme: dark;
+
+  /* Specialty Tokens */
+  --cat-general-bg: rgba(51, 65, 85, 0.25);
+  --cat-general-text: #94a3b8;
+  --cat-general-border: rgba(100, 116, 139, 0.3);
+
+  --cat-cardiology-bg: rgba(244, 63, 94, 0.12);
+  --cat-cardiology-text: #fb7185;
+  --cat-cardiology-border: rgba(244, 63, 94, 0.28);
+
+  --cat-dermatology-bg: rgba(245, 158, 11, 0.12);
+  --cat-dermatology-text: #fbbf24;
+  --cat-dermatology-border: rgba(245, 158, 11, 0.28);
+
+  --cat-neurology-bg: rgba(139, 92, 246, 0.12);
+  --cat-neurology-text: #a78bfa;
+  --cat-neurology-border: rgba(139, 92, 246, 0.28);
+
+  --cat-pediatrics-bg: rgba(6, 182, 212, 0.12);
+  --cat-pediatrics-text: #38bdf8;
+  --cat-pediatrics-border: rgba(6, 182, 212, 0.28);
+
+  --cat-orthopedics-bg: rgba(16, 185, 129, 0.12);
+  --cat-orthopedics-text: #34d399;
+  --cat-orthopedics-border: rgba(16, 185, 129, 0.28);
 }
 
 body {
@@ -72,4 +97,112 @@ body {
 
 .glow-indigo {
   box-shadow: 0 0 35px -5px rgba(99, 102, 241, 0.3);
+}
+
+.glow-amber {
+  box-shadow: 0 0 35px -5px rgba(245, 158, 11, 0.3);
+}
+
+/* Modal and transition animations */
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal-in {
+  animation: modalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ByteMed Plus-Rank Token Palette (8-Bit Scale) */
+.badge-rank-plus-1 {
+  background: rgba(6, 182, 212, 0.12);
+  color: #22d3ee;
+  border: 1px solid rgba(6, 182, 212, 0.28);
+}
+
+.badge-rank-plus-2 {
+  background: rgba(14, 165, 233, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(14, 165, 233, 0.28);
+}
+
+.badge-rank-plus-3 {
+  background: rgba(99, 102, 241, 0.12);
+  color: #818cf8;
+  border: 1px solid rgba(99, 102, 241, 0.28);
+}
+
+.badge-rank-plus-4 {
+  background: rgba(139, 92, 246, 0.12);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.28);
+}
+
+.badge-rank-plus-5 {
+  background: rgba(217, 70, 239, 0.12);
+  color: #e879f9;
+  border: 1px solid rgba(217, 70, 239, 0.28);
+}
+
+.badge-rank-plus-6 {
+  background: rgba(244, 63, 94, 0.12);
+  color: #fb7185;
+  border: 1px solid rgba(244, 63, 94, 0.28);
+}
+
+.badge-rank-plus-7 {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.15);
+}
+
+.badge-rank-plus-8 {
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.2) 0%, rgba(245, 158, 11, 0.3) 100%);
+  color: #fef08a;
+  border: 1px solid rgba(250, 204, 21, 0.55);
+  box-shadow: 0 0 16px rgba(234, 179, 8, 0.25);
+}
+
+/* Category Badge Token Palette */
+.badge-category-general {
+  background: var(--cat-general-bg);
+  color: var(--cat-general-text);
+  border: 1px solid var(--cat-general-border);
+}
+
+.badge-category-cardiology {
+  background: var(--cat-cardiology-bg);
+  color: var(--cat-cardiology-text);
+  border: 1px solid var(--cat-cardiology-border);
+}
+
+.badge-category-dermatology {
+  background: var(--cat-dermatology-bg);
+  color: var(--cat-dermatology-text);
+  border: 1px solid var(--cat-dermatology-border);
+}
+
+.badge-category-neurology {
+  background: var(--cat-neurology-bg);
+  color: var(--cat-neurology-text);
+  border: 1px solid var(--cat-neurology-border);
+}
+
+.badge-category-pediatrics {
+  background: var(--cat-pediatrics-bg);
+  color: var(--cat-pediatrics-text);
+  border: 1px solid var(--cat-pediatrics-border);
+}
+
+.badge-category-orthopedics {
+  background: var(--cat-orthopedics-bg);
+  color: var(--cat-orthopedics-text);
+  border: 1px solid var(--cat-orthopedics-border);
 }

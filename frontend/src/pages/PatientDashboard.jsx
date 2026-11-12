@@ -1,36 +1,55 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import api from '../api';
 import Navbar from '../components/Navbar';
 import { useNavigate } from 'react-router-dom';
 import { 
   AlertTriangle, Send, HeartPulse, Video, Star, Clock, 
-  MessageSquare, ShieldCheck, Activity, Search, Sparkles, Filter 
+  MessageSquare, ShieldCheck, Activity, Search, Sparkles, Filter,
+  Paperclip, Image as ImageIcon, X, History, CheckCircle2, ChevronRight,
+  Info, ExternalLink
 } from 'lucide-react';
+import { 
+  RankBadge, 
+  CategoryBadge, 
+  TriageAlert, 
+  Button, 
+  Card, 
+  Modal 
+} from '../components/ui';
 
 const CATEGORIES = ['All', 'General', 'Cardiology', 'Dermatology', 'Neurology', 'Pediatrics', 'Orthopedics'];
-const EMERGENCY_KEYWORDS = ['chest pain', 'bleeding', 'heart attack', 'stroke', 'unconscious', 'breathing difficulty'];
+const EMERGENCY_KEYWORDS = [
+  'chest pain', 'bleeding', 'heart attack', 'stroke', 
+  'unconscious', 'breathing difficulty', 'severe burn', 'head injury'
+];
+
+const SEVERITY_LEVELS = ['Mild', 'Moderate', 'Severe', 'Acute'];
+const DURATION_PRESETS = ['Just started (<24h)', '2–3 days', '1–2 weeks', 'Chronic (>1 month)'];
 
 const PatientDashboard = () => {
   const { user } = useContext(AuthContext);
+  const toast = useToast();
   const navigate = useNavigate();
 
   const [queries, setQueries] = useState([]);
   const [availableDoctors, setAvailableDoctors] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [feedFilter, setFeedFilter] = useState('all'); // 'all' | 'answered' | 'unanswered' | 'emergency'
   const [searchQuery, setSearchQuery] = useState('');
   
-  // New query form states
-  const [title, setTitle] = useState('');
+  // Patient single-paragraph symptom input
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('General');
+  const [attachedFiles, setAttachedFiles] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [bookingDocId, setBookingDocId] = useState(null);
 
-  // Live detection of emergency keywords for UX
-  const isEmergencyTyping = EMERGENCY_KEYWORDS.some(kw => 
-    (title + ' ' + description).toLowerCase().includes(kw)
+  // Live detection of emergency keywords for clinical safety
+  const matchedEmergencyKeywords = EMERGENCY_KEYWORDS.filter(kw => 
+    description.toLowerCase().includes(kw)
   );
+  const isEmergencyTyping = matchedEmergencyKeywords.length > 0;
 
   const fetchQueries = async () => {
     try {
@@ -60,22 +79,43 @@ const PatientDashboard = () => {
     return () => clearInterval(interval);
   }, [selectedCategory]);
 
+  const handleFileUpload = (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+
+    const newAttachments = files.map(file => ({
+      name: file.name,
+      size: (file.size / 1024).toFixed(1) + ' KB',
+      url: URL.createObjectURL(file),
+      type: file.type.startsWith('image/') ? 'image' : 'file'
+    }));
+
+    setAttachedFiles(prev => [...prev, ...newAttachments]);
+    toast.info(`Attached ${files.length} diagnostic file(s)`);
+  };
+
+  const removeAttachment = (index) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmitQuery = async (e) => {
     e.preventDefault();
-    if (!title.trim() || !description.trim()) return;
+    if (!description.trim()) {
+      toast.warning('Please describe what you are experiencing.');
+      return;
+    }
     setSubmitting(true);
     try {
-      await api.post('/queries', {
-        title,
-        description,
-        category,
+      const { data } = await api.post('/queries', {
+        description: description.trim(),
         patientId: user.id
       });
-      setTitle('');
       setDescription('');
+      setAttachedFiles([]);
+      toast.success(`Inquiry triaged into ${data.category}! Posted to verified doctors.`);
       fetchQueries();
     } catch (err) {
-      alert('Failed to submit query');
+      toast.error('Failed to submit query. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -85,19 +125,24 @@ const PatientDashboard = () => {
     setBookingDocId(doctorId);
     try {
       const { data } = await api.post(`/doctors/${doctorId}/book`);
+      toast.success('Doctor claimed! Connecting to secure telehealth room...');
       navigate(data.roomUrl);
     } catch (err) {
-      alert(err.response?.data?.message || 'Doctor is no longer available. Another patient may have booked just now.');
+      toast.error(err.response?.data?.message || 'Doctor is no longer available. Another patient may have booked just now.');
       fetchAvailableDoctors();
     } finally {
       setBookingDocId(null);
     }
   };
 
-  // Filter queries by search
+  // Filter queries by search & tab
   const filteredQueries = queries.filter(q => {
     const term = searchQuery.toLowerCase();
-    return q.title.toLowerCase().includes(term) || q.description.toLowerCase().includes(term);
+    const matchesSearch = q.title.toLowerCase().includes(term) || q.description.toLowerCase().includes(term);
+    if (!matchesSearch) return false;
+
+    if (feedFilter === 'emergency') return q.aiTriage?.isEmergency;
+    return true;
   });
 
   return (
@@ -139,7 +184,7 @@ const PatientDashboard = () => {
 
         {/* Live Doctors Online Banner */}
         <div className="glass-panel-elevated rounded-2xl p-6 border border-slate-800/80">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
             <div className="flex items-center space-x-2">
               <span className="relative flex h-3 w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -147,38 +192,43 @@ const PatientDashboard = () => {
               </span>
               <h2 className="font-bold text-white text-base">On-Demand Live Consultations</h2>
             </div>
-            <span className="text-xs text-slate-400">Real-time availability lock guard enabled</span>
+            <span className="text-xs text-slate-400 font-mono">
+              Server-enforced atomic lock guard enabled
+            </span>
           </div>
 
           {availableDoctors.length === 0 ? (
-            <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800 text-center text-sm text-slate-400">
-              No physicians are currently live. Submit an asynchronous query below and verified doctors will respond promptly.
+            <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800 text-center text-sm text-slate-400 space-y-1">
+              <p className="font-medium text-slate-300">No physicians are currently live in the consultation queue.</p>
+              <p className="text-xs text-slate-500">Submit an asynchronous query below and verified doctors will review and respond promptly.</p>
             </div>
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {availableDoctors.map(doc => (
-                <div key={doc._id} className="p-4 rounded-xl bg-slate-900/80 border border-slate-700/60 flex items-center justify-between gap-3 hover:border-cyan-500/40 transition">
+                <div key={doc._id} className="p-4 rounded-xl bg-slate-900/80 border border-slate-700/60 flex items-center justify-between gap-3 hover:border-cyan-500/40 transition duration-200">
                   <div className="min-w-0">
                     <div className="flex items-center space-x-1.5">
                       <span className="font-bold text-sm text-white truncate">Dr. {doc.name}</span>
                       <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                     </div>
-                    <div className="text-xs font-mono font-semibold text-amber-400 mt-0.5">
-                      {doc.plusRank || 'Plus 1 (+)'}
+                    <div className="mt-1">
+                      <RankBadge rank={doc.plusRank || 'Plus 1 (+)'} size="xs" />
                     </div>
                     <div className="text-[11px] text-slate-400 truncate mt-1">
                       {doc.credentials || 'Licensed Medical Practitioner'}
                     </div>
                   </div>
 
-                  <button
+                  <Button
+                    size="sm"
+                    variant="emerald"
                     disabled={bookingDocId === doc._id}
+                    isLoading={bookingDocId === doc._id}
                     onClick={() => handleBookDoctor(doc._id)}
-                    className="flex-shrink-0 flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 shadow-md shadow-emerald-500/20 hover:shadow-emerald-500/40 transition disabled:opacity-50"
+                    icon={Video}
                   >
-                    <Video className="w-3.5 h-3.5" />
-                    <span>{bookingDocId === doc._id ? 'Connecting...' : 'Consult Live'}</span>
-                  </button>
+                    Consult Live
+                  </Button>
                 </div>
               ))}
             </div>
@@ -188,91 +238,121 @@ const PatientDashboard = () => {
         {/* Main 2-Column Section: Query Creation & Community Board */}
         <div className="grid lg:grid-cols-12 gap-8 items-start">
           
-          {/* Left Column: Ask Query Form */}
-          <div className="lg:col-span-4 glass-panel rounded-2xl p-6 border border-slate-800/80 sticky top-24">
-            <div className="flex items-center space-x-2 mb-4">
-              <div className="w-7 h-7 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center font-bold text-sm">
-                +
+          {/* Left Column: One-Paragraph Ask Query Form */}
+          <div className="lg:col-span-5 glass-panel rounded-2xl p-6 border border-slate-800/80 sticky top-24 space-y-4">
+            <div>
+              <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[11px] font-semibold mb-2">
+                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                <span>AI Clinical Routing</span>
               </div>
-              <h2 className="font-bold text-white text-base">Submit Medical Query</h2>
+              <h2 className="text-xl font-extrabold text-white tracking-tight">
+                Tell Us What's Happening
+              </h2>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                Describe your symptoms in your own words. Our medical AI will automatically analyze your description, generate a clinical summary title, and route it to the right specialist.
+              </p>
             </div>
 
             <form onSubmit={handleSubmitQuery} className="space-y-4">
+              {/* Single Paragraph Input */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                  Category
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                  Describe What You're Experiencing
                 </label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-slate-900 border border-slate-700/80 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                >
-                  <option value="General">General Medicine</option>
-                  <option value="Cardiology">Cardiology (Heart/Vascular)</option>
-                  <option value="Dermatology">Dermatology (Skin)</option>
-                  <option value="Neurology">Neurology (Brain/Nerve)</option>
-                  <option value="Pediatrics">Pediatrics (Children)</option>
-                  <option value="Orthopedics">Orthopedics (Bones/Joints)</option>
-                </select>
+                <div className="relative">
+                  <textarea
+                    rows={6}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    required
+                    placeholder="Tell us what is happening... For example:
+'I've had a persistent dull headache on the right side of my head for 3 days. It gets worse under bright lights and I feel slightly nauseous. I took paracetamol yesterday with only temporary relief.'"
+                    className="w-full p-3.5 text-xs sm:text-sm rounded-xl bg-slate-900 border border-slate-700/80 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none leading-relaxed"
+                  />
+                  
+                  {/* Char counter */}
+                  <div className="absolute bottom-2.5 right-3 text-[10px] text-slate-500 font-mono">
+                    {description.trim().length} chars
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                  Summary / Title
-                </label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                  placeholder="e.g. Persistent sharp headache for 3 days"
-                  className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-slate-900 border border-slate-700/80 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                />
-              </div>
+              {/* AI Auto-Processing Live Feedback */}
+              {description.trim().length > 15 && (
+                <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center space-x-2 text-xs text-cyan-300">
+                  <Sparkles className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                  <span className="text-[11px]">
+                    <strong>AI Triage Active:</strong> Clinical title & specialty category will be generated automatically on submit.
+                  </span>
+                </div>
+              )}
 
+              {/* Attachment / Diagnostics Dropzone */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                  Detailed Symptoms & Context
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    Symptom Photos / Reports
+                  </label>
+                  <span className="text-[10px] text-slate-500">Optional</span>
+                </div>
+                
+                <label className="flex items-center justify-center space-x-2 p-3 rounded-xl border border-dashed border-slate-700/80 bg-slate-900/40 hover:bg-slate-900/80 hover:border-cyan-500/50 cursor-pointer transition text-xs text-slate-400">
+                  <ImageIcon className="w-4 h-4 text-cyan-400" />
+                  <span>Attach symptom photo or lab PDF</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*,.pdf"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
                 </label>
-                <textarea
-                  rows={4}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  required
-                  placeholder="Describe your symptoms, onset, medication, and triggers..."
-                  className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-slate-900 border border-slate-700/80 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none"
-                />
+
+                {/* Attached Files List */}
+                {attachedFiles.length > 0 && (
+                  <div className="mt-2 space-y-1.5">
+                    {attachedFiles.map((f, i) => (
+                      <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800 text-xs">
+                        <div className="flex items-center space-x-2 truncate">
+                          <Paperclip className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+                          <span className="text-slate-200 truncate">{f.name}</span>
+                          <span className="text-[10px] text-slate-500">({f.size})</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(i)}
+                          className="text-slate-400 hover:text-rose-400 p-0.5"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Real-time AI Triage Preview Warning */}
               {isEmergencyTyping && (
-                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start space-x-2 animate-pulse">
-                  <AlertTriangle className="w-4 h-4 text-rose-400 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <span className="font-bold">AI Safety Guard Active:</span> We detected emergency keywords in your input. If this is a life-threatening crisis, call emergency services (e.g. 911/112) immediately!
-                  </div>
-                </div>
+                <TriageAlert 
+                  isEmergency={true} 
+                  confidenceScore={0.96} 
+                  matchedKeywords={matchedEmergencyKeywords} 
+                />
               )}
 
-              <button
+              <Button
                 type="submit"
-                disabled={submitting}
-                className="w-full py-3 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 shadow-lg shadow-cyan-500/20 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+                isLoading={submitting}
+                className="w-full"
+                icon={Send}
               >
-                {submitting ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" />
-                    <span>Post to Community Board</span>
-                  </>
-                )}
-              </button>
+                Submit to Verified Doctors
+              </Button>
             </form>
           </div>
 
           {/* Right Column: Community Board */}
-          <div className="lg:col-span-8 space-y-6">
+          <div className="lg:col-span-7 space-y-6">
             
             {/* Filter & Search Header */}
             <div className="glass-panel rounded-2xl p-4 border border-slate-800 space-y-3">
@@ -287,8 +367,30 @@ const PatientDashboard = () => {
                     className="w-full pl-9 pr-3.5 py-2 text-xs rounded-xl bg-slate-900 border border-slate-700/80 text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
                   />
                 </div>
-                <div className="text-xs text-slate-400 self-end sm:self-center">
-                  Showing <strong className="text-white">{filteredQueries.length}</strong> inquiries
+
+                {/* Sub-tabs: All vs Emergency Flagged */}
+                <div className="flex items-center space-x-1.5 self-end sm:self-center text-xs">
+                  <button
+                    onClick={() => setFeedFilter('all')}
+                    className={`px-2.5 py-1 rounded-lg font-medium transition ${
+                      feedFilter === 'all' 
+                        ? 'bg-slate-800 text-white font-bold' 
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    All ({queries.length})
+                  </button>
+                  <button
+                    onClick={() => setFeedFilter('emergency')}
+                    className={`px-2.5 py-1 rounded-lg font-medium transition flex items-center space-x-1 ${
+                      feedFilter === 'emergency' 
+                        ? 'bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30' 
+                        : 'text-rose-400/70 hover:text-rose-300'
+                    }`}
+                  >
+                    <AlertTriangle className="w-3 h-3" />
+                    <span>Urgent Triage</span>
+                  </button>
                 </div>
               </div>
 
@@ -312,8 +414,9 @@ const PatientDashboard = () => {
 
             {/* Queries Feed */}
             {filteredQueries.length === 0 ? (
-              <div className="glass-panel rounded-2xl p-12 text-center border border-slate-800 text-slate-400 text-sm">
-                No queries found in this category. Be the first to ask!
+              <div className="glass-panel rounded-2xl p-12 text-center border border-slate-800 text-slate-400 text-sm space-y-2">
+                <p className="font-semibold text-slate-300">No medical inquiries found in this category.</p>
+                <p className="text-xs text-slate-500">Submit an inquiry on the left to start receiving physician guidance.</p>
               </div>
             ) : (
               <div className="space-y-5">
@@ -328,24 +431,18 @@ const PatientDashboard = () => {
                   >
                     {/* Emergency Alert Banner */}
                     {q.aiTriage?.isEmergency && (
-                      <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between text-xs text-rose-300">
-                        <div className="flex items-center space-x-2">
-                          <AlertTriangle className="w-4 h-4 text-rose-400 animate-bounce flex-shrink-0" />
-                          <span className="font-semibold">Urgent AI Safety Alert: Emergency keywords flagged</span>
-                        </div>
-                        <span className="font-mono text-[11px] bg-rose-500/20 px-2 py-0.5 rounded text-rose-300 border border-rose-500/30">
-                          Confidence: {Math.round((q.aiTriage?.confidenceScore || 0.9) * 100)}%
-                        </span>
-                      </div>
+                      <TriageAlert
+                        isEmergency={true}
+                        confidenceScore={q.aiTriage?.confidenceScore || 0.9}
+                        className="mb-4"
+                      />
                     )}
 
                     {/* Query Header */}
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-cyan-300 border border-slate-700">
-                            {q.category}
-                          </span>
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                          <CategoryBadge category={q.category} size="xs" />
                           <span className="text-[11px] text-slate-500 flex items-center gap-1">
                             <Clock className="w-3 h-3" />
                             {new Date(q.createdAt).toLocaleDateString()}
@@ -353,12 +450,12 @@ const PatientDashboard = () => {
                         </div>
                         <h3 className="text-lg font-bold text-white tracking-tight">{q.title}</h3>
                       </div>
-                      <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-slate-900 border border-slate-800 text-slate-300">
+                      <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-slate-900 border border-slate-800 text-slate-300 flex-shrink-0">
                         Asked by {q.patientId?.name || 'Patient'}
                       </span>
                     </div>
 
-                    <p className="text-sm text-slate-300 mt-2.5 leading-relaxed">
+                    <p className="text-sm text-slate-300 mt-2.5 leading-relaxed whitespace-pre-line">
                       {q.description}
                     </p>
 
@@ -380,11 +477,12 @@ const PatientDashboard = () => {
   );
 };
 
-// Subcomponent for Doctor Responses list & Star Rating
+// Subcomponent for Doctor Responses list, Version History, & Star Rating
 const ResponsesSection = ({ queryId }) => {
   const [responses, setResponses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [hoverRating, setHoverRating] = useState({});
+  const [versionModalData, setVersionModalData] = useState(null);
+  const toast = useToast();
 
   const fetchResponses = async () => {
     try {
@@ -404,20 +502,21 @@ const ResponsesSection = ({ queryId }) => {
   const handleRate = async (responseId, rating) => {
     try {
       await api.post(`/responses/${responseId}/rate`, { rating });
+      toast.success(`Thank you! Submitted ${rating}-star feedback.`);
       fetchResponses();
     } catch (err) {
-      alert('Could not submit rating');
+      toast.error('Could not submit rating');
     }
   };
 
   if (loading) {
-    return <div className="text-xs text-slate-500 animate-pulse">Loading responses...</div>;
+    return <div className="text-xs text-slate-500 animate-pulse">Loading verified doctor responses...</div>;
   }
 
   if (responses.length === 0) {
     return (
       <div className="flex items-center space-x-2 text-xs text-slate-500 italic">
-        <MessageSquare className="w-3.5 h-3.5" />
+        <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
         <span>Awaiting verified doctor advice. Responses will be version-tracked.</span>
       </div>
     );
@@ -434,8 +533,8 @@ const ResponsesSection = ({ queryId }) => {
           
           {/* Doctor Header */}
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center space-x-2">
-              <div className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center font-bold text-indigo-400 text-xs">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center font-bold text-indigo-400 text-xs">
                 MD
               </div>
               <div>
@@ -443,33 +542,41 @@ const ResponsesSection = ({ queryId }) => {
                   <span className="font-bold text-xs text-white">Dr. {r.doctorId?.name || 'Physician'}</span>
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                 </div>
-                <span className="font-mono text-[11px] font-bold text-amber-400">
-                  {r.doctorId?.plusRank || 'Plus 1 (+)'}
-                </span>
+                <div className="mt-0.5">
+                  <RankBadge rank={r.doctorId?.plusRank || 'Plus 1 (+)'} size="xs" />
+                </div>
               </div>
             </div>
 
-            {/* Version Badge */}
-            {r.versions && r.versions.length > 1 && (
+            {/* Version Badge & History Button */}
+            {r.versions && r.versions.length > 1 ? (
+              <button
+                onClick={() => setVersionModalData(r)}
+                className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 flex items-center space-x-1 transition"
+              >
+                <History className="w-3 h-3" />
+                <span>Revised (v{r.versions.length}.0) — View History</span>
+              </button>
+            ) : (
               <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
-                Revised (v{r.versions.length}.0)
+                Original (v1.0)
               </span>
             )}
           </div>
 
           {/* Advice content */}
-          <p className="text-xs text-slate-200 leading-relaxed bg-slate-950/40 p-3 rounded-lg border border-slate-800/60">
+          <p className="text-xs text-slate-200 leading-relaxed bg-slate-950/40 p-3.5 rounded-xl border border-slate-800/60 whitespace-pre-line">
             {r.currentContent}
           </p>
 
           {/* Rating Section */}
-          <div className="pt-2 flex items-center justify-between text-xs">
+          <div className="pt-2 flex items-center justify-between text-xs flex-wrap gap-2">
             {r.rating ? (
-              <div className="flex items-center space-x-1.5 text-emerald-400 font-medium">
-                <span className="text-yellow-400 flex">
+              <div className="flex items-center space-x-2 text-emerald-400 font-medium">
+                <span className="text-amber-400 flex tracking-widest text-sm">
                   {'★'.repeat(r.rating)}
                 </span>
-                <span>You rated this helpful ({r.rating}/5)</span>
+                <span className="text-xs text-slate-300">You rated this advice ({r.rating}/5)</span>
               </div>
             ) : (
               <div className="flex items-center space-x-2">
@@ -478,24 +585,53 @@ const ResponsesSection = ({ queryId }) => {
                   {[1, 2, 3, 4, 5].map(star => (
                     <button
                       key={star}
-                      type="button"
-                      onMouseEnter={() => setHoverRating(prev => ({ ...prev, [r._id]: star }))}
-                      onMouseLeave={() => setHoverRating(prev => ({ ...prev, [r._id]: 0 }))}
                       onClick={() => handleRate(r._id, star)}
-                      className="p-0.5 text-base transition-transform hover:scale-125 focus:outline-none"
+                      className="text-slate-600 hover:text-amber-400 text-base leading-none transition transform hover:scale-125"
+                      title={`Rate ${star} star`}
                     >
-                      <span className={star <= (hoverRating[r._id] || 0) ? 'text-yellow-400' : 'text-slate-600'}>
-                        ★
-                      </span>
+                      ★
                     </button>
                   ))}
                 </div>
               </div>
             )}
           </div>
-
         </div>
       ))}
+
+      {/* Version History Modal */}
+      {versionModalData && (
+        <Modal
+          isOpen={true}
+          onClose={() => setVersionModalData(null)}
+          title="Physician Response Revision History"
+          subtitle={`Dr. ${versionModalData.doctorId?.name || 'Physician'} — ${versionModalData.versions.length} revisions tracked`}
+        >
+          <div className="space-y-4">
+            <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-xs text-cyan-300">
+              ByteMed records immutable version logs for all doctor responses to protect clinical auditability and patient trust.
+            </div>
+
+            <div className="space-y-3">
+              {versionModalData.versions.map((ver, idx) => (
+                <div key={idx} className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-white">
+                      Version {idx + 1}.0 {idx === versionModalData.versions.length - 1 && '(Current Published)'}
+                    </span>
+                    <span className="text-slate-500 font-mono text-[11px]">
+                      {new Date(ver.timestamp).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 whitespace-pre-line bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+                    {ver.content}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

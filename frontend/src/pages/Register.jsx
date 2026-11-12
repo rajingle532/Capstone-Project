@@ -1,7 +1,9 @@
 import React, { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { HeartPulse, Mail, Lock, User, FileText, ArrowRight, Stethoscope, UserCheck, CheckCircle2 } from 'lucide-react';
+import { HeartPulse, Mail, Lock, User, FileText, ArrowRight, Stethoscope, UserCheck } from 'lucide-react';
+import Button from '../components/ui/Button';
 
 const Register = () => {
   const [name, setName] = useState('');
@@ -12,6 +14,7 @@ const Register = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { register } = useContext(AuthContext);
+  const toast = useToast();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -20,9 +23,12 @@ const Register = () => {
     setLoading(true);
     try {
       await register({ name, email, password, role, credentials });
+      toast.success('Account created! Please sign in with your credentials.');
       navigate('/login');
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed. Please check your information.');
+      const msg = err.response?.data?.message || 'Registration failed. Please check your information.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -98,7 +104,7 @@ const Register = () => {
 
             {/* Name */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
                 Full Name
               </label>
               <div className="relative rounded-xl shadow-sm">
@@ -110,7 +116,7 @@ const Register = () => {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  placeholder={role === 'DOCTOR' ? 'Dr. Elizabeth Chen' : 'Jane Doe'}
+                  placeholder={role === 'DOCTOR' ? 'e.g. Sarah Jenkins, M.D.' : 'e.g. Alex Morgan'}
                   className="block w-full pl-10 pr-3.5 py-2.5 text-sm rounded-xl bg-slate-900/90 border border-slate-700/80 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition"
                 />
               </div>
@@ -118,7 +124,7 @@ const Register = () => {
 
             {/* Email */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
                 Email Address
               </label>
               <div className="relative rounded-xl shadow-sm">
@@ -138,7 +144,7 @@ const Register = () => {
 
             {/* Password */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
                 Password
               </label>
               <div className="relative rounded-xl shadow-sm">
@@ -156,48 +162,46 @@ const Register = () => {
               </div>
             </div>
 
-            {/* Doctor Verification Notice & Credentials Input */}
+            {/* Doctor Credentials */}
             {role === 'DOCTOR' && (
-              <div className="p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 space-y-2">
-                <div className="flex items-center space-x-2 text-indigo-300 text-xs font-semibold">
-                  <FileText className="w-4 h-4" />
-                  <span>Medical Credentials & License</span>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Medical License / Credentials
+                </label>
+                <div className="relative rounded-xl shadow-sm">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <input
+                    type="text"
+                    value={credentials}
+                    onChange={(e) => setCredentials(e.target.value)}
+                    required
+                    placeholder="e.g. MD License #48921 (Cardiology)"
+                    className="block w-full pl-10 pr-3.5 py-2.5 text-sm rounded-xl bg-slate-900/90 border border-slate-700/80 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition"
+                  />
                 </div>
-                <input
-                  type="text"
-                  value={credentials}
-                  onChange={(e) => setCredentials(e.target.value)}
-                  required
-                  placeholder="e.g. State Medical Board License # / Verification URL"
-                  className="block w-full px-3 py-2 text-xs rounded-lg bg-slate-900 border border-indigo-500/30 text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                />
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Doctor accounts enter a <strong className="text-amber-400">PENDING</strong> verification status until admin credentials approval.
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Credentials undergo administrative verification before opening physician responding.
                 </p>
               </div>
             )}
 
-            <button
+            <Button
               type="submit"
-              disabled={loading}
-              className="w-full mt-4 flex items-center justify-center py-3 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-all duration-200 disabled:opacity-50"
+              isLoading={loading}
+              className="w-full mt-2"
+              icon={ArrowRight}
             >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              ) : (
-                <>
-                  <span>Complete Registration</span>
-                  <ArrowRight className="ml-2 w-4 h-4" />
-                </>
-              )}
-            </button>
+              Complete Registration
+            </Button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-slate-800/80 text-center">
+          <div className="mt-6 pt-5 border-t border-slate-800/80 text-center">
             <p className="text-xs text-slate-400">
               Already have an account?{' '}
               <Link to="/login" className="font-semibold text-cyan-400 hover:text-cyan-300 transition">
-                Sign in here
+                Sign in
               </Link>
             </p>
           </div>

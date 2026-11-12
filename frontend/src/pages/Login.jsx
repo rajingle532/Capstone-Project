@@ -1,7 +1,9 @@
 import React, { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { HeartPulse, Lock, Mail, ArrowRight } from 'lucide-react';
+import { HeartPulse, Lock, Mail, ArrowRight, UserCheck, Stethoscope, Clock } from 'lucide-react';
+import Button from '../components/ui/Button';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -9,6 +11,7 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useContext(AuthContext);
+  const toast = useToast();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -17,16 +20,25 @@ const Login = () => {
     setLoading(true);
     try {
       const user = await login(email, password);
+      toast.success(`Welcome back, ${user.role === 'DOCTOR' ? 'Dr. ' : ''}${user.name}!`);
       if (user.role === 'DOCTOR') {
         navigate('/doctor');
       } else {
         navigate('/patient');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid email or password. Please try again.');
+      const msg = err.response?.data?.message || 'Invalid email or password. Please try again.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDemoFill = (demoEmail, demoPass) => {
+    setEmail(demoEmail);
+    setPassword(demoPass);
+    setError('');
   };
 
   return (
@@ -100,23 +112,50 @@ const Login = () => {
               </div>
             </div>
 
-            <button
+            <Button
               type="submit"
-              disabled={loading}
-              className="w-full mt-2 flex items-center justify-center py-3 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 transition-all duration-200 disabled:opacity-50"
+              isLoading={loading}
+              className="w-full mt-2"
+              icon={ArrowRight}
             >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              ) : (
-                <>
-                  <span>Sign In</span>
-                  <ArrowRight className="ml-2 w-4 h-4" />
-                </>
-              )}
-            </button>
+              Sign In
+            </Button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-slate-800/80 text-center">
+          {/* Quick Demo Fill Buttons */}
+          <div className="mt-6 pt-5 border-t border-slate-800/80">
+            <span className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-center mb-2.5">
+              Quick Test Sign In
+            </span>
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => handleDemoFill('patient.alice@bytemed.com', 'password123')}
+                className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white flex flex-col items-center justify-center gap-1 transition"
+              >
+                <UserCheck className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="text-[11px] font-semibold">Patient Alice</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoFill('doctor.smith@bytemed.com', 'password123')}
+                className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white flex flex-col items-center justify-center gap-1 transition"
+              >
+                <Stethoscope className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="text-[11px] font-semibold">Dr. Smith (Plus 8)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoFill('doctor.pending@bytemed.com', 'password123')}
+                className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white flex flex-col items-center justify-center gap-1 transition"
+              >
+                <Clock className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-[11px] font-semibold">Pending Doctor</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-6 pt-5 border-t border-slate-800/80 text-center">
             <p className="text-xs text-slate-400">
               New to ByteMed?{' '}
               <Link to="/register" className="font-semibold text-cyan-400 hover:text-cyan-300 transition">

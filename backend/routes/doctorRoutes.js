@@ -62,6 +62,29 @@ router.post('/:id/book', async (req, res) => {
   }
 });
 
+// Get all verified doctors for leaderboard
+router.get('/', async (req, res) => {
+  try {
+    const doctors = await User.find({ role: 'DOCTOR', status: 'VERIFIED' })
+      .select('name plusRank availability credentials ratingSum ratingCount createdAt');
+    res.json(doctors);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get specific doctor details
+router.get('/:id', async (req, res) => {
+  try {
+    const doctor = await User.findById(req.params.id)
+      .select('name plusRank availability credentials ratingSum ratingCount status');
+    if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
+    res.json(doctor);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // End session
 router.post('/:id/end-session', async (req, res) => {
   try {
